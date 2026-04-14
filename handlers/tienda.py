@@ -200,6 +200,10 @@ async def mostrar_item(id_item, descripcion, update: Update, context: ContextTyp
     item_precio = get_campo_item(id_item, "precio")
     item_imagen = get_campo_item(id_item, "imagen")
 
+if not item_imagen:
+    await query.answer("❌ Este item no tiene imagen configurada", show_alert=True)
+    return
+
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ruta_absoluta_imagen = os.path.join(BASE_DIR, item_imagen)
 
