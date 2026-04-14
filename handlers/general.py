@@ -19,7 +19,7 @@ async def verificar_admin(user_id: int, update: Update) -> bool:
         if comunidad["id_comunidad"] == com_id:
             print("ENCONTRÓ COMUNIDAD")
             print("ADMINS DE ESA COMUNIDAD:", comunidad["admins"])
-            return user_id in comunidad["admins"]
+            return int(user_id) in [int(x) for x in comunidad["admins"]]
 
     print("NO ENCONTRÓ COMUNIDAD")
     return False
