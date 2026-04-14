@@ -11,14 +11,14 @@ from sqlgestion import get_campo_usuario,normalizar_nombre,update_perfil,insert_
 async def verificar_admin(user_id: int, update: Update) -> bool:
     com_id = update.effective_chat.id
 
-    print("USER_ID:", user_id)
+    print("USER_ID:", user_id, type(user_id))
     print("CHAT_ID:", com_id)
     print("ADMINS:", ADMINS)
 
     for comunidad in ADMINS:
         if comunidad["id_comunidad"] == com_id:
             print("ENCONTRÓ COMUNIDAD")
-            print("ADMINS DE ESA COMUNIDAD:", comunidad["admins"])
+            print("ADMINS:", [(x, type(x)) for x in comunidad["admins"]])
             return int(user_id) in [int(x) for x in comunidad["admins"]]
 
     print("NO ENCONTRÓ COMUNIDAD")
