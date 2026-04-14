@@ -8,7 +8,7 @@ from sqlgestion import get_campo_usuario,normalizar_nombre,update_perfil,insert_
 #region FUNCIONES AUXILIARES
 
     
-aasync def verificar_admin(user_id: int, update: Update) -> bool:
+async def verificar_admin(user_id: int, update: Update) -> bool:
     com_id = update.effective_chat.id
     real_user_id = update.effective_user.id
 
