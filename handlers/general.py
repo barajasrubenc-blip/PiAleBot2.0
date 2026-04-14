@@ -8,20 +8,18 @@ from sqlgestion import get_campo_usuario,normalizar_nombre,update_perfil,insert_
 #region FUNCIONES AUXILIARES
 
 async def verificar_admin(user_id: int, update: Update) -> bool:
-com_id = update.effective_chat.id
-real_user_id = update.effective_user.id
+    com_id = update.effective_chat.id
+    real_user_id = update.effective_user.id
 
-```
-# 🔥 FORZAR TU USUARIO COMO ADMIN SIEMPRE
-if real_user_id == 1174798556:
-    return True
+    # FORZAR TU ID COMO ADMIN
+    if real_user_id == 1174798556:
+        return True
 
-# Validación normal por comunidad
-for comunidad in ADMINS:
-    if comunidad["id_comunidad"] == com_id:
-        return real_user_id in comunidad["admins"]
+    for comunidad in ADMINS:
+        if comunidad["id_comunidad"] == com_id:
+            return real_user_id in comunidad["admins"]
 
-return False
+    return False
 ```
 
 def obtener_gif_aleatorio(nombre_producto):
