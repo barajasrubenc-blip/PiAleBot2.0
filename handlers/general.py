@@ -8,20 +8,14 @@ from sqlgestion import get_campo_usuario,normalizar_nombre,update_perfil,insert_
 #region FUNCIONES AUXILIARES
 
     
-async def verificar_admin(user_id: int, update: Update) -> bool:
+aasync def verificar_admin(user_id: int, update: Update) -> bool:
     com_id = update.effective_chat.id
-
-    print("USER_ID:", user_id, type(user_id))
-    print("CHAT_ID:", com_id)
-    print("ADMINS:", ADMINS)
+    real_user_id = update.effective_user.id
 
     for comunidad in ADMINS:
         if comunidad["id_comunidad"] == com_id:
-            print("ENCONTRÓ COMUNIDAD")
-            print("ADMINS:", [(x, type(x)) for x in comunidad["admins"]])
-            return int(user_id) in [int(x) for x in comunidad["admins"]]
+            return real_user_id in comunidad["admins"]
 
-    print("NO ENCONTRÓ COMUNIDAD")
     return False
 
 def obtener_gif_aleatorio(nombre_producto):
