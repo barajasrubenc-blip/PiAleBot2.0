@@ -204,6 +204,10 @@ if not item_imagen:
     await query.answer("❌ Este item no tiene imagen configurada", show_alert=True)
     return
 
+if not item_imagen:
+    await query.answer("❌ Este item no tiene imagen configurada", show_alert=True)
+    return
+
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ruta_absoluta_imagen = os.path.join(BASE_DIR, item_imagen)
 
