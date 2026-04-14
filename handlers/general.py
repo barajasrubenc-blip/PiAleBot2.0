@@ -10,13 +10,18 @@ from sqlgestion import get_campo_usuario,normalizar_nombre,update_perfil,insert_
     
 async def verificar_admin(user_id: int, update: Update) -> bool:
     com_id = update.effective_chat.id
+
+    print("USER_ID:", user_id)
+    print("CHAT_ID:", com_id)
+    print("ADMINS:", ADMINS)
+
     for comunidad in ADMINS:
         if comunidad["id_comunidad"] == com_id:
-            admins = comunidad["admins"]
-    
-    if user_id in admins:
-        return True
-    
+            print("ENCONTRÓ COMUNIDAD")
+            print("ADMINS DE ESA COMUNIDAD:", comunidad["admins"])
+            return user_id in comunidad["admins"]
+
+    print("NO ENCONTRÓ COMUNIDAD")
     return False
 
 def obtener_gif_aleatorio(nombre_producto):
