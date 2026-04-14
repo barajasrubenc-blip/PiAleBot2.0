@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Bot Configuration
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8645052053:AAFeJueksjulFpVUZRP06RwMF66TAcMsfhI")
 
 if not BOT_TOKEN:
     raise ValueError(
