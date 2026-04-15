@@ -394,3 +394,21 @@ def update_item(id_item: int, **datos) -> bool:
     except Exception as e:
         print(f"[ERROR DB] update_item: {e}")
         return False
+
+def get_id_user(username: str):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id_user FROM perfiles_tb WHERE username = ?",
+            (username,)
+        )
+
+        resultado = cursor.fetchone()
+        conn.close()
+
+        return resultado[0] if resultado else None
+    except Exception as e:
+        print(f"[ERROR DB] get_id_user: {e}")
+        return None
