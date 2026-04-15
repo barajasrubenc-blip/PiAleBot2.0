@@ -297,3 +297,55 @@ def normalizar_nombre(nombre, apellido=""):
     texto = ''.join(c for c in texto if not unicodedata.combining(c))
     texto = re.sub(r'[^a-zA-Z0-9 ]', '', texto)
     return texto.lower()
+
+# ==================== EXTRA FUNCTIONS (COMPATIBILIDAD) ====================
+
+def update_perfil(id_user: int, **datos) -> bool:
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        columnas = ", ".join([f"{col} = ?" for col in datos.keys()])
+        valores = list(datos.values()) + [id_user]
+
+        cursor.execute(f"UPDATE perfiles_tb SET {columnas} WHERE id_user = ?", valores)
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[ERROR DB] update_perfil: {e}")
+        return False
+
+
+def insert_item(nombre: str, precio: int, imagen: str, descripcion: str = None, mensaje: str = None) -> bool:
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO items_tb (nombre, precio, imagen, descripcion, mensaje) VALUES (?, ?, ?, ?, ?)",
+            (nombre, precio, imagen, descripcion, mensaje)
+        )
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[ERROR DB] insert_item: {e}")
+        return False
+
+
+def get_id_item(nombre: str):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id_item FROM items_tb WHERE nombre = ?", (nombre,))
+        resultado = cursor.fetchone()
+
+        conn.close()
+        return resultado[0] if resultado else None
+    except Exception as e:
+        print(f"[ERROR DB] get_id_item: {e}")
+        return None
