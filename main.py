@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 from src.config import BOT_TOKEN, DOMS, obtener_temas_por_comunidad, PUNISHMENT_FILE
-from src.database.database import create_database, create_tables, restart_all_combats, connect
+from src.database.database import create_database, create_tables, restart_all_combats, _get_connection
 
 from handlers.general import dar, ver, regalar, numero_azar, quitar
 from handlers.starting_menu import start, menu_callback
@@ -68,9 +68,7 @@ async def saludar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     mensaje_bienvenida = (
         "🎄✨ *¡Ho, ho, ho! Llegó PiBot al chat* ✨🎄\n"
         "¡Hola a todos! 🤖🎅\n"
-        "Estoy aquí para traer *alegría, buena vibra y espíritu navideño* a este lugar.\n"
-        "Prepárense para luces, diversión y un montón de sorpresas festivas. 🎁❄️\n\n"
-        "¡Que comience la magia navideña! 🎅🤖✨"
+        "Estoy aquí para traer *alegría, buena vibra y espíritu navideño*.\n"
     )
     await update.message.reply_text(mensaje_bienvenida, parse_mode="Markdown")
 
@@ -84,34 +82,22 @@ async def castigar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     
     if actor_id not in DOMS:
-        await update.message.reply_text("❌ No tienes permisos para usar este comando.")
+        await update.message.reply_text("❌ No tienes permisos.")
         return
     
     from handlers.general import get_receptor
     usuario_objetivo = await get_receptor(update, context, 1)
     
     if usuario_objetivo in (False, None):
-        await update.message.reply_text("❌ No pude identificar al usuario objetivo.")
         return
     
     target_id = usuario_objetivo.id
-    target_username = usuario_objetivo.username or usuario_objetivo.first_name
-
-    if target_id not in DOMS.get(actor_id, []):
-        await update.message.reply_text(f"❌ No puedes castigar a {target_username}.")
-        return
 
     castigados = cargar_castigados()
-    
-    if chat_id not in castigados:
-        castigados[chat_id] = set()
-    
-    castigados[chat_id].add(target_id)
+    castigados.setdefault(chat_id, set()).add(target_id)
     guardar_castigados(castigados)
 
-    await update.message.reply_text(
-        f"🔇 @{target_username} te has portado mal. Ahora tendrás que quedarte en el rincón."
-    )
+    await update.message.reply_text("🔇 Usuario castigado.")
 
 
 async def filtro_castigo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -120,87 +106,24 @@ async def filtro_castigo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    username = update.effective_user.username or update.effective_user.first_name
 
     temas = obtener_temas_por_comunidad(-1003290179217)
     if not temas:
         return
     
     rincon_id = temas.get("theme_rincon")
-    
-    castigados = cargar_castigados()
-    
-    if chat_id not in castigados:
-        return
-    
-    if user_id not in castigados[chat_id]:
-        return
-
-    topic = update.message.message_thread_id
-    
-    if topic != rincon_id:
-        try:
-            await update.message.delete()
-            await context.bot.send_message(
-                chat_id=chat_id,
-                message_thread_id=topic,
-                text=f"Oh oh... @{username} fue atrapado fuera del rincón :)"
-            )
-        except:
-            pass
-    
-
-async def perdonar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    chat_id = update.effective_chat.id
-    actor_id = update.effective_user.id
-
-    if chat_id != -1003290179217:
-        await update.message.reply_text("❌ Este comando no está habilitado en este grupo.")
-        return
-
-    if actor_id not in DOMS:
-        await update.message.reply_text("❌ No tienes permiso para usar este comando.")
-        return
-
-    from handlers.general import get_receptor
-    usuario_objetivo = await get_receptor(update, context, args_length=1)
-
-    if usuario_objetivo in (False, None):
-        await update.message.reply_text("❌ No pude identificar al usuario.")
-        return
-
-    target_id = usuario_objetivo.id
-    target_username = usuario_objetivo.username or usuario_objetivo.first_name
-
-    if target_id not in DOMS.get(actor_id, []):
-        await update.message.reply_text(f"❌ No puedes perdonar a @{target_username}.")
-        return
-
     castigados = cargar_castigados()
 
-    if chat_id not in castigados or target_id not in castigados[chat_id]:
-        await update.message.reply_text(f"ℹ️ @{target_username} no está castigado.")
-        return
-
-    castigados[chat_id].remove(target_id)
-    
-    if not castigados[chat_id]:
-        del castigados[chat_id]
-    
-    guardar_castigados(castigados)
-
-    await update.message.reply_text(
-        f"✅ @{target_username} ha sido perdonado."
-    )
+    if chat_id in castigados and user_id in castigados[chat_id]:
+        if update.message.message_thread_id != rincon_id:
+            try:
+                await update.message.delete()
+            except:
+                pass
 
 
 async def bloquear_comunidad(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.effective_chat:
-        return
-
-    if update.effective_chat.id == -1003397946543:
-        if update.message:
-            await update.message.reply_text("❌ Este bot no está habilitado para esta comunidad.")
+    if update.effective_chat and update.effective_chat.id == -1003397946543:
         raise ApplicationHandlerStop()
 
 
@@ -209,8 +132,8 @@ def main() -> None:
     create_tables()
     restart_all_combats()
 
-    # 🔥 FIX: insertar items SIEMPRE
-    conn = connect()
+    # 🔥 INSERTAR ITEMS CORRECTAMENTE (usando tu conexión real)
+    conn = _get_connection()
     cursor = conn.cursor()
 
     print("[INIT] Insertando items tienda...")
@@ -219,11 +142,11 @@ def main() -> None:
 
     items = [
         ("Collar", 10, "img_items/collar.png", "Un collar elegante", "{user} le coloca un collar a {target} 🐶"),
-        ("Latigo", 15, "img_items/latigo.png", "Para castigos intensos", "{user} azota a {target} 🔥"),
+        ("Latigo", 15, "img_items/latigo.png", "Para castigos", "{user} azota a {target} 🔥"),
         ("Fusta", 12, "img_items/fusta.png", "Castigo elegante", "{user} usa la fusta sobre {target} 😈"),
-        ("Galleta", 5, "img_items/galleta.png", "Premio dulce", "{user} le da una galleta a {target} 🍪"),
-        ("bola_mordaza", 20, "img_items/bola_mordaza.png", "Silencio total", "{user} le pone una mordaza a {target} 🤐"),
-        ("sorpresa", 25, "img_items/sorpresa.png", "Algo inesperado", "{user} sorprende a {target} 🎁"),
+        ("Galleta", 5, "img_items/galleta.png", "Premio", "{user} le da una galleta a {target} 🍪"),
+        ("bola_mordaza", 20, "img_items/bola_mordaza.png", "Silencio", "{user} le pone una mordaza a {target} 🤐"),
+        ("sorpresa", 25, "img_items/sorpresa.png", "Sorpresa", "{user} sorprende a {target} 🎁"),
     ]
 
     for item in items:
@@ -241,29 +164,14 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", start), group=0)
     app.add_handler(CommandHandler("castigar", castigar), group=0)
-    app.add_handler(CommandHandler("perdonar", perdonar), group=0)
-    
+
     app.add_handler(CommandHandler("apostar", apostar), group=1)
     app.add_handler(CommandHandler("aceptar", aceptar), group=1)
-    app.add_handler(CommandHandler("cancelar", cancelar_apuesta), group=1)
-    app.add_handler(CommandHandler("robar", robar), group=1)
-    app.add_handler(CommandHandler("jugar", jugar), group=1)
-    app.add_handler(CommandHandler("usar", usar), group=1)
     app.add_handler(MessageHandler(filters.Dice.DICE, detectar_dado), group=1)
 
     app.add_handler(CommandHandler("tienda", tienda), group=2)
     app.add_handler(CommandHandler("inventario", inventario), group=2)
     app.add_handler(CommandHandler("ver", ver), group=2)
-    app.add_handler(CommandHandler("regalar", regalar), group=2)
-    app.add_handler(CommandHandler("dar", dar), group=2)
-    app.add_handler(CommandHandler("quitar", quitar), group=2)
-    app.add_handler(CommandHandler("NumAzar", numero_azar), group=2)
-    app.add_handler(CommandHandler("id", get_theme_id), group=2)
-    app.add_handler(CommandHandler("saludar", saludar), group=2)
-
-    app.add_handler(CommandHandler("lucha", lucha), group=2)
-    app.add_handler(CommandHandler("aceptarlucha", aceptar_lucha), group=2)
-    app.add_handler(CommandHandler("ataque", ataque), group=2)
 
     app.add_handler(
         MessageHandler(
@@ -271,22 +179,6 @@ def main() -> None:
             manejar_imagenes
         ),
         group=3
-    )
-
-    app.add_handler(
-        CallbackQueryHandler(
-            menu_callback,
-            pattern="^(ver_comandos|abrir_tienda|ver_inventario|perfil)$"
-        ),
-        group=5
-    )
-
-    app.add_handler(
-        CallbackQueryHandler(
-            inventario_callback,
-            pattern="^(inv_prev_|inv_next_|ver_item_)"
-        ),
-        group=5
     )
 
     app.add_handler(
@@ -299,7 +191,7 @@ def main() -> None:
 
     app.add_handler(MessageHandler(filters.ALL, filtro_castigo), group=6)
 
-    print("🤖 PiBot iniciado e listo para recibir mensajes...")
+    print("🤖 PiBot iniciado...")
     app.run_polling(drop_pending_updates=True)
 
 
