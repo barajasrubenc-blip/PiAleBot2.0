@@ -15,34 +15,42 @@ async def manejar_imagenes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     group_id = update.effective_chat.id
     CHAT_IDS = obtener_temas_por_comunidad(group_id)
+    thread_id = update.message.message_thread_id
+
+    print("GROUP:", group_id)
+    print("THREAD:", thread_id)
+    print("CHAT_IDS:", CHAT_IDS)
 
     if not CHAT_IDS:
-        return  # 🔴 evita que truene todo si no encuentra la comunidad
-
-    thread_id = update.message.message_thread_id
+        return
 
     # MULTIMEDIA
     if CHAT_IDS.get("theme_multimedia") == thread_id:
+        print("ENTRO MULTIMEDIA")
         await detectar_imagenes_multimedia(update, context)
         return
 
     # PRESENTACIONES
     if group_id != -1003290179217:
         if CHAT_IDS.get("theme_presentaciones") == thread_id:
+            print("ENTRO PRESENTACIONES")
             await detectar_imagen_presentacion(update, context)
             return
     else:
         if thread_id is None:
+            print("ENTRO PRESENTACIONES (sin thread)")
             await detectar_imagen_presentacion(update, context)
             return
 
     # NSFW
     if CHAT_IDS.get("theme_NSFW") == thread_id:
+        print("ENTRO NSFW")
         await detectar_imagenes_nsfw(update, context)
         return
 
     # EXHIBICIONISMO
     if CHAT_IDS.get("theme_Exhibicionismo") == thread_id:
+        print("ENTRO EXHIBICION")
         await detectar_exhibicion(update, context)
         return
 
