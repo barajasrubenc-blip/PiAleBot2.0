@@ -7,44 +7,33 @@ from sqlgestion import get_campo_usuario,normalizar_nombre,update_perfil,insert_
 
 #region FUNCIONES AUXILIARES
 
-    
 async def verificar_admin(user_id: int, update: Update) -> bool:
     com_id = update.effective_chat.id
+
     for comunidad in ADMINS:
         if comunidad["id_comunidad"] == com_id:
-            admins = comunidad["admins"]
-    
-    if user_id in admins:
-        return True
-    
+            return user_id in comunidad["admins"]
+
     return False
 
 def obtener_gif_aleatorio(nombre_producto):
     nombre_carpeta = nombre_producto.lower()
 
-    # Carpeta relativa desde inventario.py
     ruta_carpeta = os.path.join(os.path.dirname(__file__), "..", "gifs_items", nombre_carpeta)
-
-    # Normalizamos la ruta
     ruta_carpeta = os.path.abspath(ruta_carpeta)
 
-    # Comprobamos que existe
     if not os.path.isdir(ruta_carpeta):
         print(f"No existe la carpeta: {ruta_carpeta}")
         return None, None
 
-    # Listamos solo GIFs
     archivos = [f for f in os.listdir(ruta_carpeta) if f.endswith(".gif")]
 
     if not archivos:
         print(f"No hay GIFs en {ruta_carpeta}")
         return None, None
 
-    # Elegimos uno al azar
     gif_seleccionado = random.choice(archivos)
     gif_path = os.path.join(ruta_carpeta, gif_seleccionado)
-
-    # Caption basado en la descripción
 
     return gif_path
 
@@ -59,20 +48,36 @@ async def get_receptor(update: Update, context: ContextTypes.DEFAULT_TYPE,args_l
         
         mention = context.args[args_length-1].lstrip("@")
         user_id = get_id_user(mention)
-        if not user_id is None:
+
+        # 🔽 fallback si no está en DB
+        if user_id is None:
+            chat = update.effective_chat
+            try:
+                miembros = await chat.get_administrators()
+                for m in miembros:
+                    if m.user.username and m.user.username.lower() == mention.lower():
+                        user_id = m.user.id
+                        break
+            except:
+                pass
+
+        if user_id is not None:
             receptor = type("obj", (object,), {"id": int(user_id), "username": mention})
         else:
             receptor = None
+
     elif update.message.reply_to_message:
         try:
             receptor = update.message.reply_to_message.from_user
             if get_campo_usuario(receptor.id,"id_user") is None:
                 insert_user(receptor.id,0,receptor.username,normalizar_nombre(receptor.first_name,receptor.last_name))
-        except Exception as e:
+        except Exception:
             receptor = None
     else:
         receptor = None
+
     return receptor
+
 #endregion
 
 
@@ -106,6 +111,7 @@ async def ver(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"💰 {sql_username}, tienes {saldo} PiPesos."
     )
+
 async def dar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender = update.effective_user
 
@@ -128,12 +134,7 @@ async def dar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if receptor is None or receptor is False:
         await update.message.reply_text("⚠️ No se encontró al usuario receptor o no ha sido ingresado al sistema aún, si está usando @ evitelos y use el comando respondiendo un mensaje")
         return
-
-#    if sender.id == 5661536115 and receptor.id != 1370162159:
-#        await update.message.reply_text("No no Ara, debes tener permiso de tu dueño @Nicolas_Dom si quieres usar tus pipesos, te has portado mal")
-#        return
     
-    # Verificar saldo del emisor
     sender_id = sender.id
     sql_sender_username = get_campo_usuario(sender_id,"username")
     tmp_sender_username = sender.username
@@ -166,6 +167,7 @@ async def dar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🤝 {sql_sender_username or sql_sender_nombre} dio {cantidad} PiPesos a "
         f"{receptor_username}"
     ) 
+
 async def numero_azar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
         return await update.message.reply_text(
@@ -183,7 +185,7 @@ async def numero_azar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     if n1 > n2:
-        n1, n2 = n2, n1  # si los ponen al revés, los acomodamos
+        n1, n2 = n2, n1
 
     resultado = random.randint(n1, n2)
 
@@ -192,13 +194,14 @@ async def numero_azar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_to_message_id=update.message.message_id
     )
+
 #endregion
 
 
 
 
 #region COMANDOS ADMINS
-# TODO arreglar la funcion de quitar - temporalmente eliminada por mal uso
+
 async def quitar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender = update.effective_user
     
@@ -206,12 +209,10 @@ async def quitar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Solo los administradores pueden usar este comando.")
         return
 
-    # Verificar que haya al menos un argumento (cantidad)
     if len(context.args) < 1:
         await update.message.reply_text("Uso: /quitar <cantidad>")
         return
     
-    # Intentar convertir la cantidad
     try:
         cantidad = int(context.args[0])
         if cantidad <= 0:
@@ -225,22 +226,17 @@ async def quitar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("No es posible identificar al usuario")
         return
 
-#    if sender.id == 5661536115 and receptor.id != 1370162159:
-#        await update.message.reply_text("No no Ara, debes tener permiso de tu dueño @Nicolas_Dom si quieres usar tus pipesos, te has portado mal")
-#        return
-
     receptor_id = receptor.id
     receptor_username = receptor.username
-    # Quitar puntos
 
     quitar_puntos(receptor_id, cantidad)
     await update.message.reply_text(
         f"✅ Se han quitado {cantidad} PiPesos a @{receptor_username}."
     )
+
 async def regalar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender = update.effective_user
     
-    # 🔐 Verificar admin
     if not await verificar_admin(sender.id, update):
         await update.message.reply_text("⚠️ Solo los administradores pueden usar este comando.")
         return
@@ -265,9 +261,6 @@ async def regalar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ No fue posible identificar al usuario")
         return
     
-#    if sender.id == 5661536115 and receptor.id != 1370162159:
-#        await update.message.reply_text("No no Ara, debes tener permiso de tu dueño @Nicolas_Dom si quieres usar tus pipesos, te has portado mal")
-#        return
     receptor_id = receptor.id
     receptor_username = receptor.username
     
@@ -277,4 +270,5 @@ async def regalar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎁 {sender.username} regaló {cantidad} PiPesos a "
         f"{receptor_username}"
     )
+
 #endregion

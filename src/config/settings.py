@@ -28,7 +28,7 @@ if not BOT_TOKEN:
 # Community configurations with their topic IDs
 COMUNIDADES = [
     {
-        "id_comunidad": -1003290179217,  # Kiusama (main community)
+        "id_comunidad": -1002983018006,  # Kiusama (main community)
         "nombre": "Kiusama",
         "temas": {
             "theme_anuncios": 526,
