@@ -1,21 +1,20 @@
 import re
 import sqlite3 as sql
 import unicodedata
-from typing import Optional, Dict, List, Any
+from typing import Optional, List, Dict, Any
 
-from src.config import DATABASE_FILE
+from src.config.settings import DATABASE_FILE
 
 
-def create_database() -> None:
+def create_database():
     conn = sql.connect(DATABASE_FILE)
     conn.commit()
     conn.close()
 
 
-def create_tables() -> None:
+def create_tables():
     conn = sql.connect(DATABASE_FILE)
     cursor = conn.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON;")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios_tb (
@@ -41,44 +40,22 @@ def create_tables() -> None:
             id_user INTEGER NOT NULL,
             id_item INTEGER NOT NULL,
             cantidad INTEGER NOT NULL DEFAULT 1,
-            FOREIGN KEY (id_user) REFERENCES usuarios_tb(id_user) ON DELETE CASCADE,
-            FOREIGN KEY (id_item) REFERENCES items_tb(id_item) ON DELETE CASCADE,
             UNIQUE(id_user, id_item)
         );
     """)
 
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_usuario ON items_usuarios_tb(id_user);")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_item ON items_usuarios_tb(id_item);")
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS perfiles_tb (
             id_user INTEGER PRIMARY KEY,
-            username TEXT UNIQUE,
-            nombre TEXT NOT NULL,
-            rol TEXT,
-            orientacion_sexual TEXT,
-            genero TEXT,
-            ubicacion TEXT,
-            edad INTEGER,
-            FOREIGN KEY (id_user) REFERENCES usuarios_tb(id_user) ON DELETE CASCADE
+            username TEXT,
+            nombre TEXT
         );
     """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS combates_tb (
             id_combate INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_atacante INTEGER NOT NULL,
-            id_defensor INTEGER NOT NULL,
-            username_atacante TEXT NOT NULL,
-            username_defensor TEXT NOT NULL,
-            apuesta INTEGER NOT NULL DEFAULT 0,
-            hp_atacante INTEGER NOT NULL DEFAULT 20,
-            hp_defensor INTEGER NOT NULL DEFAULT 20,
-            turno INTEGER NOT NULL DEFAULT 1,
-            es_turno_atacante INTEGER NOT NULL DEFAULT 1,
-            estado TEXT NOT NULL DEFAULT 'activo',
-            ganador INTEGER,
-            fecha_inicio DATETIME DEFAULT CURRENT_TIMESTAMP
+            estado TEXT DEFAULT 'activo'
         );
     """)
 
@@ -125,14 +102,30 @@ def get_campo_usuario(id_user, columna):
         return None
 
 
-def dar_puntos(id_user, cantidad):
-    saldo = get_campo_usuario(id_user, "saldo") or 0
-    return update_saldo(id_user, saldo + cantidad)
+def update_perfil(id_user: int, **datos):
+    columnas_validas = {"nombre", "username"}
 
+    if not datos:
+        return False
 
-def quitar_puntos(id_user, cantidad):
-    saldo = get_campo_usuario(id_user, "saldo") or 0
-    return update_saldo(id_user, max(0, saldo - cantidad))
+    for col in datos:
+        if col not in columnas_validas:
+            return False
+
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        columnas = ", ".join([f"{col} = ?" for col in datos.keys()])
+        valores = list(datos.values()) + [id_user]
+
+        cursor.execute(f"UPDATE perfiles_tb SET {columnas} WHERE id_user = ?", valores)
+
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        return False
 
 
 def update_saldo(id_user, saldo):
@@ -147,44 +140,23 @@ def update_saldo(id_user, saldo):
         return False
 
 
+def dar_puntos(id_user, cantidad):
+    saldo = get_campo_usuario(id_user, "saldo") or 0
+    return update_saldo(id_user, saldo + cantidad)
+
+
+def quitar_puntos(id_user, cantidad):
+    saldo = get_campo_usuario(id_user, "saldo") or 0
+    return update_saldo(id_user, max(0, saldo - cantidad))
+
+
 # ================= ITEMS =================
-
-def insert_item(nombre, precio, ruta_imagen, descripcion=None, mensaje=None):
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "INSERT INTO items_tb (nombre, precio, imagen, descripcion, mensaje) VALUES (?, ?, ?, ?, ?)",
-            (nombre, precio, ruta_imagen, descripcion, mensaje)
-        )
-
-        conn.commit()
-        conn.close()
-        return True
-    except:
-        return False
-
 
 def get_campo_item(id_item, columna):
     try:
         conn = _get_connection()
         cursor = conn.cursor()
         cursor.execute(f"SELECT {columna} FROM items_tb WHERE id_item = ?", (id_item,))
-        r = cursor.fetchone()
-        conn.close()
-        return r[0] if r else None
-    except:
-        return None
-
-
-def get_id_item(nombre):
-    nombre = normalizar_nombre(nombre).capitalize()
-
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id_item FROM items_tb WHERE nombre = ?", (nombre,))
         r = cursor.fetchone()
         conn.close()
         return r[0] if r else None
@@ -304,6 +276,19 @@ def delete_item_user(id_user, id_item):
         return False
 
 
+# ================= COMBATES =================
+
+def restart_all_combats():
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE combates_tb SET estado = 'cancelado'")
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+
 # ================= UTILS =================
 
 def normalizar_nombre(nombre, apellido=""):
@@ -312,18 +297,3 @@ def normalizar_nombre(nombre, apellido=""):
     texto = ''.join(c for c in texto if not unicodedata.combining(c))
     texto = re.sub(r'[^a-zA-Z0-9 ]', '', texto)
     return texto.lower()
-
-
-def restart_all_combats():
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "UPDATE combates_tb SET estado = 'cancelado' WHERE estado = 'activo'"
-        )
-
-        conn.commit()
-        conn.close()
-    except:
-        pass
