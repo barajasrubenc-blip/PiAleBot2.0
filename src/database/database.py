@@ -349,3 +349,48 @@ def get_id_item(nombre: str):
     except Exception as e:
         print(f"[ERROR DB] get_id_item: {e}")
         return None
+
+# ==================== FUNCIONES FALTANTES ====================
+
+def delete_user(id_user: int) -> bool:
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM usuarios_tb WHERE id_user = ?", (id_user,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[ERROR DB] delete_user: {e}")
+        return False
+
+
+def delete_item(id_item: int) -> bool:
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM items_tb WHERE id_item = ?", (id_item,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[ERROR DB] delete_item: {e}")
+        return False
+
+
+def update_item(id_item: int, **datos) -> bool:
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        columnas = ", ".join([f"{col} = ?" for col in datos.keys()])
+        valores = list(datos.values()) + [id_item]
+
+        cursor.execute(f"UPDATE items_tb SET {columnas} WHERE id_item = ?", valores)
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[ERROR DB] update_item: {e}")
+        return False
