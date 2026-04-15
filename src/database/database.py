@@ -6,14 +6,19 @@ from typing import Optional, List, Dict, Any
 from src.config.settings import DATABASE_FILE
 
 
+# ================= CORE =================
+
+def _get_connection():
+    return sql.connect(DATABASE_FILE)
+
+
 def create_database():
-    conn = sql.connect(DATABASE_FILE)
-    conn.commit()
+    conn = _get_connection()
     conn.close()
 
 
 def create_tables():
-    conn = sql.connect(DATABASE_FILE)
+    conn = _get_connection()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -24,11 +29,19 @@ def create_tables():
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS perfiles_tb (
+            id_user INTEGER PRIMARY KEY,
+            username TEXT,
+            nombre TEXT
+        );
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS items_tb (
             id_item INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL UNIQUE,
-            precio INTEGER NOT NULL,
-            imagen TEXT NOT NULL,
+            nombre TEXT UNIQUE,
+            precio INTEGER,
+            imagen TEXT,
             descripcion TEXT,
             mensaje TEXT
         );
@@ -37,18 +50,10 @@ def create_tables():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS items_usuarios_tb (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_user INTEGER NOT NULL,
-            id_item INTEGER NOT NULL,
-            cantidad INTEGER NOT NULL DEFAULT 1,
+            id_user INTEGER,
+            id_item INTEGER,
+            cantidad INTEGER DEFAULT 1,
             UNIQUE(id_user, id_item)
-        );
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS perfiles_tb (
-            id_user INTEGER PRIMARY KEY,
-            username TEXT,
-            nombre TEXT
         );
     """)
 
@@ -63,10 +68,6 @@ def create_tables():
     conn.close()
 
 
-def _get_connection():
-    return sql.connect(DATABASE_FILE)
-
-
 # ================= USERS =================
 
 def insert_user(id_user, saldo=0, username=None, nombre=None):
@@ -77,8 +78,8 @@ def insert_user(id_user, saldo=0, username=None, nombre=None):
         conn = _get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("INSERT INTO usuarios_tb (id_user, saldo) VALUES (?, ?);", (id_user, saldo))
-        cursor.execute("INSERT INTO perfiles_tb (id_user, username, nombre) VALUES (?, ?, ?);",
+        cursor.execute("INSERT INTO usuarios_tb (id_user, saldo) VALUES (?, ?)", (id_user, saldo))
+        cursor.execute("INSERT INTO perfiles_tb (id_user, username, nombre) VALUES (?, ?, ?)",
                        (id_user, username, nombre))
 
         conn.commit()
@@ -102,21 +103,12 @@ def get_campo_usuario(id_user, columna):
         return None
 
 
-def update_perfil(id_user: int, **datos):
-    columnas_validas = {"nombre", "username"}
-
-    if not datos:
-        return False
-
-    for col in datos:
-        if col not in columnas_validas:
-            return False
-
+def update_perfil(id_user, **datos):
     try:
         conn = _get_connection()
         cursor = conn.cursor()
 
-        columnas = ", ".join([f"{col} = ?" for col in datos.keys()])
+        columnas = ", ".join([f"{k} = ?" for k in datos.keys()])
         valores = list(datos.values()) + [id_user]
 
         cursor.execute(f"UPDATE perfiles_tb SET {columnas} WHERE id_user = ?", valores)
@@ -152,11 +144,69 @@ def quitar_puntos(id_user, cantidad):
 
 # ================= ITEMS =================
 
+def insert_item(nombre, precio, imagen, descripcion=None, mensaje=None):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "INSERT INTO items_tb (nombre, precio, imagen, descripcion, mensaje) VALUES (?, ?, ?, ?, ?)",
+            (nombre, precio, imagen, descripcion, mensaje)
+        )
+
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        return False
+
+
 def get_campo_item(id_item, columna):
     try:
         conn = _get_connection()
         cursor = conn.cursor()
         cursor.execute(f"SELECT {columna} FROM items_tb WHERE id_item = ?", (id_item,))
+        r = cursor.fetchone()
+        conn.close()
+        return r[0] if r else None
+    except:
+        return None
+
+
+def update_item(id_item, **datos):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        columnas = ", ".join([f"{k} = ?" for k in datos.keys()])
+        valores = list(datos.values()) + [id_item]
+
+        cursor.execute(f"UPDATE items_tb SET {columnas} WHERE id_item = ?", valores)
+
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        return False
+
+
+def delete_item(id_item):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM items_tb WHERE id_item = ?", (id_item,))
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        return False
+
+
+def get_id_item(nombre):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id_item FROM items_tb WHERE nombre = ?", (nombre,))
         r = cursor.fetchone()
         conn.close()
         return r[0] if r else None
@@ -178,10 +228,9 @@ def insert_user_item(id_user, id_item, cantidad=1):
         r = cursor.fetchone()
 
         if r:
-            nueva = r[0] + cantidad
             cursor.execute(
                 "UPDATE items_usuarios_tb SET cantidad = ? WHERE id_user = ? AND id_item = ?",
-                (nueva, id_user, id_item)
+                (r[0] + cantidad, id_user, id_item)
             )
         else:
             cursor.execute(
@@ -276,7 +325,33 @@ def delete_item_user(id_user, id_item):
         return False
 
 
-# ================= COMBATES =================
+# ================= OTROS =================
+
+def delete_user(id_user):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM usuarios_tb WHERE id_user = ?", (id_user,))
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        return False
+
+
+def get_id_user(username):
+    try:
+        conn = _get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id_user FROM perfiles_tb WHERE username = ?", (username,))
+        r = cursor.fetchone()
+        conn.close()
+
+        return r[0] if r else None
+    except:
+        return None
+
 
 def restart_all_combats():
     try:
@@ -298,117 +373,16 @@ def normalizar_nombre(nombre, apellido=""):
     texto = re.sub(r'[^a-zA-Z0-9 ]', '', texto)
     return texto.lower()
 
-# ==================== EXTRA FUNCTIONS (COMPATIBILIDAD) ====================
 
-def update_perfil(id_user: int, **datos) -> bool:
+def to_plain_text(texto):
     try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-
-        columnas = ", ".join([f"{col} = ?" for col in datos.keys()])
-        valores = list(datos.values()) + [id_user]
-
-        cursor.execute(f"UPDATE perfiles_tb SET {columnas} WHERE id_user = ?", valores)
-
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[ERROR DB] update_perfil: {e}")
-        return False
+        texto = unicodedata.normalize("NFKD", texto)
+        texto = ''.join(c for c in texto if not unicodedata.combining(c))
+        texto = re.sub(r'[^a-zA-Z0-9 ]', '', texto)
+        return texto.lower().strip()
+    except:
+        return ""
 
 
-def insert_item(nombre: str, precio: int, imagen: str, descripcion: str = None, mensaje: str = None) -> bool:
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "INSERT INTO items_tb (nombre, precio, imagen, descripcion, mensaje) VALUES (?, ?, ?, ?, ?)",
-            (nombre, precio, imagen, descripcion, mensaje)
-        )
-
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[ERROR DB] insert_item: {e}")
-        return False
-
-
-def get_id_item(nombre: str):
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT id_item FROM items_tb WHERE nombre = ?", (nombre,))
-        resultado = cursor.fetchone()
-
-        conn.close()
-        return resultado[0] if resultado else None
-    except Exception as e:
-        print(f"[ERROR DB] get_id_item: {e}")
-        return None
-
-# ==================== FUNCIONES FALTANTES ====================
-
-def delete_user(id_user: int) -> bool:
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM usuarios_tb WHERE id_user = ?", (id_user,))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[ERROR DB] delete_user: {e}")
-        return False
-
-
-def delete_item(id_item: int) -> bool:
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM items_tb WHERE id_item = ?", (id_item,))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[ERROR DB] delete_item: {e}")
-        return False
-
-
-def update_item(id_item: int, **datos) -> bool:
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-
-        columnas = ", ".join([f"{col} = ?" for col in datos.keys()])
-        valores = list(datos.values()) + [id_item]
-
-        cursor.execute(f"UPDATE items_tb SET {columnas} WHERE id_item = ?", valores)
-
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"[ERROR DB] update_item: {e}")
-        return False
-
-def get_id_user(username: str):
-    try:
-        conn = _get_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "SELECT id_user FROM perfiles_tb WHERE username = ?",
-            (username,)
-        )
-
-        resultado = cursor.fetchone()
-        conn.close()
-
-        return resultado[0] if resultado else None
-    except Exception as e:
-        print(f"[ERROR DB] get_id_user: {e}")
-        return None
+def reemplazar_acentos(cadena):
+    return unicodedata.normalize("NFKD", cadena).encode("ascii", "ignore").decode("utf-8")
