@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 from src.config import BOT_TOKEN, DOMS, obtener_temas_por_comunidad, PUNISHMENT_FILE
-from src.database.database import create_database, create_tables, restart_all_combats
+from src.database.database import create_database, create_tables, restart_all_combats, connect
 
 from handlers.general import dar, ver, regalar, numero_azar, quitar
 from handlers.starting_menu import start, menu_callback
@@ -208,7 +208,33 @@ def main() -> None:
     create_database()
     create_tables()
     restart_all_combats()
-    
+
+    # 🔥 FIX: insertar items SIEMPRE
+    conn = connect()
+    cursor = conn.cursor()
+
+    print("[INIT] Insertando items tienda...")
+
+    cursor.execute("DELETE FROM items_tb")
+
+    items = [
+        ("Collar", 10, "img_items/collar.png", "Un collar elegante", "{user} le coloca un collar a {target} 🐶"),
+        ("Latigo", 15, "img_items/latigo.png", "Para castigos intensos", "{user} azota a {target} 🔥"),
+        ("Fusta", 12, "img_items/fusta.png", "Castigo elegante", "{user} usa la fusta sobre {target} 😈"),
+        ("Galleta", 5, "img_items/galleta.png", "Premio dulce", "{user} le da una galleta a {target} 🍪"),
+        ("bola_mordaza", 20, "img_items/bola_mordaza.png", "Silencio total", "{user} le pone una mordaza a {target} 🤐"),
+        ("sorpresa", 25, "img_items/sorpresa.png", "Algo inesperado", "{user} sorprende a {target} 🎁"),
+    ]
+
+    for item in items:
+        cursor.execute("""
+            INSERT INTO items_tb (nombre, precio, imagen, descripcion, mensaje)
+            VALUES (?, ?, ?, ?, ?)
+        """, item)
+
+    conn.commit()
+    conn.close()
+
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(MessageHandler(filters.ALL, bloquear_comunidad), group=-1)
@@ -239,7 +265,6 @@ def main() -> None:
     app.add_handler(CommandHandler("aceptarlucha", aceptar_lucha), group=2)
     app.add_handler(CommandHandler("ataque", ataque), group=2)
 
-    # ✅ FIX CORRECTO (no filters.ALL)
     app.add_handler(
         MessageHandler(
             filters.PHOTO | filters.VIDEO | filters.ANIMATION,
