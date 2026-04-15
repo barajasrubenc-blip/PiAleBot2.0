@@ -27,6 +27,8 @@ from handlers.rewards import manejar_imagenes
 
 from handlers.welcoming import nuevo_usuario, mensaje_de_presentaciones
 
+from sqlgestion import insert_item  # 👈 IMPORTANTE
+
 RUTA_CASTIGADOS = PUNISHMENT_FILE
 
 
@@ -208,7 +210,16 @@ def main() -> None:
     create_database()
     create_tables()
     restart_all_combats()
-    
+
+    # 🔥 CARGA DE ITEMS (SOLO TEMPORAL)
+    print("[INIT] Cargando items tienda...")
+    insert_item("Collar", 50, "img_items/collar.png")
+    insert_item("Latigo", 100, "img_items/latigo.png")
+    insert_item("Fusta", 80, "img_items/fusta.png")
+    insert_item("Galleta", 20, "img_items/galleta.png")
+    insert_item("Bola mordaza", 60, "img_items/bola_mordaza.png")
+    insert_item("Sorpresa", 999, "img_items/sorpresa.png")
+
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(MessageHandler(filters.ALL, bloquear_comunidad), group=-1)
@@ -240,10 +251,7 @@ def main() -> None:
     app.add_handler(CommandHandler("ataque", ataque), group=2)
 
     app.add_handler(
-        MessageHandler(
-            filters.ALL,
-            manejar_imagenes
-        ),
+        MessageHandler(filters.ALL, manejar_imagenes),
         group=3
     )
 
