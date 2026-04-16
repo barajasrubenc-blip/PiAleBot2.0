@@ -1,5 +1,6 @@
 import json
 import os
+import asyncio
 from telegram import ChatPermissions, Update
 from telegram.ext import (
     Application,
@@ -127,12 +128,17 @@ async def bloquear_comunidad(update: Update, context: ContextTypes.DEFAULT_TYPE)
         raise ApplicationHandlerStop()
 
 
+# 🔥 ESTE ES EL FIX DEL CONFLICT
+async def limpiar_updates(app):
+    await app.bot.delete_webhook(drop_pending_updates=True)
+
+
 def main() -> None:
     create_database()
     create_tables()
     restart_all_combats()
 
-    # 🔥 INSERTAR ITEMS CORRECTAMENTE (usando tu conexión real)
+    # 🔥 INSERTAR ITEMS
     conn = _get_connection()
     cursor = conn.cursor()
 
@@ -159,6 +165,9 @@ def main() -> None:
     conn.close()
 
     app = Application.builder().token(BOT_TOKEN).build()
+
+    # 🔥 aplicar limpieza
+    app.post_init = limpiar_updates
 
     app.add_handler(MessageHandler(filters.ALL, bloquear_comunidad), group=-1)
 
