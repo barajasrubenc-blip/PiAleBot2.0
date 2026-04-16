@@ -1,7 +1,7 @@
 import os
 from telegram import InputMediaPhoto, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-from sqlgestion import get_campo_usuario, get_campo_item, quitar_puntos, insert_user_item, get_cantidad_item_inventario, update_cantidad
+from src.database.database import get_campo_usuario, get_campo_item, quitar_puntos, insert_user_item, get_cantidad_item_inventario, update_cantidad
 from telegram.error import TelegramError
 
 # ==============================
@@ -190,7 +190,6 @@ async def mostrar_item(id_item, descripcion, update: Update, context: ContextTyp
 
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    # 🔥 FIX CLAVE (NO CRASHEA)
     if not item_imagen:
         print(f"[ERROR] Item {id_item} no tiene imagen en DB")
         await query.edit_message_caption(
